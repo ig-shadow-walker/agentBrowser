@@ -11,6 +11,7 @@ import { send, isDaemonRunning } from "./cli/client.js";
 import { startDaemon } from "./cli/daemon.js";
 import { startMcpServer } from "./mcp/server.js";
 import { registerAll, selfInvocation } from "./install/register.js";
+import { runSelfInstall, runUninstall, shouldSelfInstall } from "./install/selfInstall.js";
 import { VERSION, PLAYWRIGHT_VERSION } from "./version.js";
 
 function out(text: string): void {
@@ -44,6 +45,8 @@ CREDENTIALS
   secrets rm <NAME>         Remove a credential
 
 SETUP
+  install                   Install onto PATH and connect to Claude Code / Codex
+  uninstall                 Remove the binary and disconnect from your agents
   mcp                       Run as an MCP server over stdio (how agents call it)
   install-mcp               Register this binary with Claude Code and Codex
   install-browser           Download the Chromium build this version needs
@@ -145,7 +148,24 @@ async function main(): Promise<void> {
   const [, , command, ...rest] = process.argv;
 
   switch (command) {
+    // A bare invocation from outside a bin directory means the user just
+    // downloaded this file and ran it — install, rather than print help at them.
     case undefined:
+      if (shouldSelfInstall()) {
+        await runSelfInstall();
+        return;
+      }
+      out(helpText());
+      return;
+
+    case "install":
+      await runSelfInstall();
+      return;
+
+    case "uninstall":
+      await runUninstall();
+      return;
+
     case "help":
     case "-h":
     case "--help": {

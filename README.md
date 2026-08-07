@@ -1,211 +1,467 @@
 # agentBrowser
 
-A headless browser that Claude Code and Codex can drive **without the restrictions Chrome and Safari impose on in-page automation**.
+**A headless browser your coding agent can actually drive.** Claude Code and Codex get a real Chromium with none of the restrictions that Chrome and Safari put on in-page automation — so they can log into your internal tools, fill forms, and upload files, start to finish.
 
-## Why this exists
+---
 
-Agents that automate a browser through an extension or injected JavaScript hit a wall on internal tools. The clearest case is file upload: browsers require a genuine user gesture before opening a file picker, so page-level JS cannot attach a file to `<input type="file">`. That is a deliberate anti-abuse protection, and it cannot be worked around from inside the page.
+## Contents
 
-agentBrowser drives Chromium over the DevTools Protocol instead. From outside the page, setting files on an input is a normal operation — no gesture required. The same applies to the other things in-page automation cannot reach: cross-origin frames, downloads, and dialogs.
+- [What problem this solves](#what-problem-this-solves)
+- [Before you start](#before-you-start)
+- [Install — step by step](#install--step-by-step)
+- [Check it worked](#check-it-worked)
+- [Store your logins](#store-your-logins)
+- [Using it from Claude Code or Codex](#using-it-from-claude-code-or-codex)
+- [Using it from the terminal](#using-it-from-the-terminal)
+- [What it can do](#what-it-can-do)
+- [Troubleshooting](#troubleshooting)
+- [Updating](#updating)
+- [Uninstalling](#uninstalling)
+- [Where your data lives](#where-your-data-lives)
+- [For developers](#for-developers)
 
-The result is a browser an agent can use to log into internal software and finish a real task end to end.
+---
 
-## Install
+## What problem this solves
+
+When an agent automates a browser through an extension or injected JavaScript, it hits a wall on internal tools. The clearest example is uploading a file: browsers demand a genuine human click before opening a file picker, so page-level JavaScript simply **cannot** attach a file to an upload field. That is a deliberate security protection, and there is no way around it from inside the page.
+
+agentBrowser drives Chromium from the outside, over the DevTools Protocol. From there, setting a file on an upload field is an ordinary operation — no human click needed. The same goes for the other things in-page automation can't reach: cross-origin frames, downloads, and native dialogs.
+
+The result is a browser your agent can use to finish a real task instead of getting stuck halfway.
+
+---
+
+## Before you start
+
+You need:
+
+- **A Mac** — Apple Silicon or Intel. (Windows and Linux are not supported yet.)
+- **Claude Code or Codex** installed.
+- **An internet connection** for the install.
+
+You do **not** need Node.js, Python, or anything else. The download is a single self-contained file.
+
+**Roughly 5 minutes**, most of it a one-time browser download.
+
+---
+
+## Install — step by step
+
+### Step 1 — Run the installer
+
+Open **Terminal** and paste this, then press Return:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ig-shadow-walker/agentBrowser/main/scripts/install.sh | bash
 ```
 
-macOS, Apple Silicon and Intel. The installer downloads the binary, verifies its checksum, puts it on your `PATH`, makes sure a Chromium is available, and registers it as an MCP server with Claude Code and Codex. Restart your agent afterwards to pick it up.
+> **Why paste a command instead of downloading and double-clicking?**
+> macOS blocks apps that arrive through a browser unless they've been through Apple's paid notarization process. Downloading with `curl` avoids that block entirely, so this is one paste with no scary security warnings. See [Troubleshooting](#i-downloaded-the-file-and-double-clicked-it-but-macos-blocked-it) if you already tried the download-and-click route.
 
-No Node.js required — the binary is self-contained.
+### Step 2 — Watch it work
 
-## How agents use it
-
-Once registered, Claude Code and Codex call it as MCP tools. The loop is:
-
-1. `navigate` to the page
-2. `snapshot` to see the elements and their refs
-3. act by ref — `click`, `type`, `upload_file`, `select_option`
-4. `snapshot` again after anything that navigates
-
-A snapshot looks like this:
+You should see roughly this:
 
 ```
-- heading "Internal Tool Login" (level=1)
-- textbox "Username" [ref=e4]
-- textbox "Password" [ref=e6]
-- button "Sign in" [ref=e7]
+  agentBrowser installer
+
+  ✓ macOS darwin-arm64
+  ✓ Version v0.1.0
+  Downloading…
+  ✓ Checksum verified
+
+  agentBrowser 0.1.0
+  Installing…
+
+  ✓ Installed to /Users/you/.local/bin/agentbrowser
+
+  ✓ Browser ready (Playwright Chromium)
+
+  Connecting to your agents
+  ✓ Claude Code: connected
+  ✓ Codex: connected
+
+  ✓ /Users/you/.local/bin is on your PATH
+
+  Done.
 ```
 
-The agent then calls `click("e7")`. Refs are stable while the page is, and every ref carries a document token — if the page navigates or re-renders, stale refs are **refused** rather than silently clicking the wrong element.
+Two things may differ, and both are fine:
 
-## Credentials
+- **"Downloading Chromium (~150MB, one time)…"** appears if you don't already have a suitable browser. It takes a minute or two.
+- **A question about your PATH.** If you see `is not on your PATH`, answer `Y`. This only affects whether you can type `agentbrowser` yourself in a terminal — your agent works either way, because it uses the full path.
 
-Credentials live in a local file and never enter the agent's context.
+If you see `✗` next to Claude Code or Codex, that agent isn't installed on this Mac. That's harmless — the other one still works.
 
-```bash
-agentbrowser secrets set INTERNAL_APP_PASSWORD 'hunter2'
-```
+### Step 3 — Restart your agent
 
-The agent calls `list_secrets` to discover names, then:
+**Quit Claude Code or Codex completely and reopen it.** They only read their tool configuration at startup, so a running instance won't see agentBrowser until you restart.
 
-```
-fill_credential(ref="e6", secret_name="INTERNAL_APP_PASSWORD")
-```
+### Step 4 — Open a new terminal
 
-The engine reads the value and types it straight into the page. It is never returned to the agent, never written to the transcript, and never written to the audit log — the log records only that `INTERNAL_APP_PASSWORD` was used. Passwords already typed into a field are also masked in snapshots.
+Only needed if the installer changed your PATH. Otherwise skip.
 
-Values are stored in `~/Library/Application Support/agentbrowser/secrets.json` (mode `0600`). Nothing leaves your machine.
+---
 
-## CLI
+## Check it worked
 
-Everything the agent can do, you can do:
-
-```bash
-agentbrowser navigate internal.example.com
-agentbrowser snapshot
-agentbrowser type e4 admin
-agentbrowser fill_credential e6 INTERNAL_APP_PASSWORD --submit
-agentbrowser upload_file e12 ~/reports/q3.pdf
-agentbrowser close
-```
-
-CLI commands share one browser session held by a background daemon, so state persists between invocations. `close` ends it. The daemon also exits on its own after 30 minutes idle.
-
-Run `agentbrowser help` for the full list, or `agentbrowser help <action>` for one.
-
-## Actions
-
-| Action | Purpose |
-| --- | --- |
-| `navigate`, `go_back`, `go_forward`, `reload` | Movement |
-| `snapshot` | Element tree with refs — the main way to read a page |
-| `screenshot` | PNG, when the visual rendering matters |
-| `get_text` | Readable page text |
-| `click`, `hover`, `press_key`, `scroll` | Interaction |
-| `type`, `select_option`, `set_checked` | Form input |
-| `fill_credential` | Type a stored secret without revealing it |
-| `upload_file` | Attach local files — the capability extensions cannot provide |
-| `list_downloads` | Files the page downloaded, and where they were saved |
-| `wait_for` | Wait for text, a load state, or a delay |
-| `evaluate` | Run JavaScript in the page |
-| `list_tabs`, `new_tab`, `select_tab`, `close_tab` | Tabs |
-| `list_secrets` | Credential names (never values) |
-| `reset_session` | Drop all cookies and start clean |
-
-`upload_file` handles both a real `<input type="file">` and the common pattern of a styled button that opens a hidden picker — pass whichever element the snapshot shows.
-
-## Sessions
-
-Sessions are deliberately **not** persistent. Each one starts with no cookies and no storage, so every task authenticates from scratch and nothing leaks between tasks. Nothing is written to a browser profile on disk.
-
-## Audit log
-
-Every action is appended to `~/Library/Application Support/agentbrowser/audit.log` as JSON — what ran, against which URL, whether it succeeded. Since this operates on real internal systems with real credentials, the log is how you check what an agent actually did.
-
-```bash
-agentbrowser audit 50
-```
-
-Credential values never appear. Any known secret value found in a logged field is replaced with `«redacted»`, so a password stays out of the log even if an agent typed it through `type` instead of `fill_credential`.
-
-## Troubleshooting
+Run:
 
 ```bash
 agentbrowser doctor
 ```
 
-Shows the install paths and which browsers are usable. agentBrowser prefers Playwright's pinned Chromium, then a system Google Chrome, then Edge. If none work:
+You should see something like:
+
+```
+agentbrowser 0.1.0
+
+Binary:      /Users/you/.local/bin/agentbrowser
+Config dir:  /Users/you/Library/Application Support/agentbrowser
+Secrets:     none stored
+Audit log:   /Users/you/Library/Application Support/agentbrowser/audit.log
+
+Browsers (first working one is used):
+  ✓ bundled  Chromium 151.0.7922.34
+  ✓ chrome   Chromium 151.0.7922.77
+  ✗ msedge   Chromium distribution 'msedge' is not found at /Applications/Microsoft Edge.app…
+
+claude:      /Users/you/.local/bin/claude
+codex:       not on PATH
+```
+
+**You need at least one `✓` in the browsers list.** More than one is fine — it uses the first that works. An `✗` next to a browser you don't have installed is expected and harmless.
+
+Then confirm your agent can see it:
+
+```bash
+claude mcp list
+```
+
+```
+agentbrowser: /Users/you/.local/bin/agentbrowser mcp - ✔ Connected
+```
+
+`✔ Connected` means you're done.
+
+---
+
+## Store your logins
+
+Do this **before** asking an agent to log into anything. Passwords you store here never reach the agent — it only ever sees the *name* you gave them.
+
+```bash
+agentbrowser secrets set INTERNAL_APP_PASSWORD 'your-actual-password'
+```
+
+Use single quotes so special characters survive. Check what you've stored:
+
+```bash
+agentbrowser secrets list
+```
+
+```
+Stored credentials (values never shown):
+  INTERNAL_APP_PASSWORD
+```
+
+Values are never printed — not here, not to your agent, not into the log.
+
+**How it works.** The agent asks for a field to be filled with `INTERNAL_APP_PASSWORD`. agentBrowser looks the value up itself and types it straight into the page. The password never passes through the agent's reasoning, never lands in your chat transcript, and never enters the audit log:
+
+```
+Filled input "Password" [e2] with secret "INTERNAL_APP_PASSWORD" (value not shown).
+```
+
+Remove one with `agentbrowser secrets rm INTERNAL_APP_PASSWORD`.
+
+---
+
+## Using it from Claude Code or Codex
+
+There's nothing to invoke. Just ask, in plain language:
+
+> Log into our admin tool at internal.example.com as `admin` using the stored `INTERNAL_APP_PASSWORD`, go to Reports, and upload `~/Documents/q3.pdf`.
+
+Behind the scenes the agent takes a *snapshot* of the page — a compact list of everything it can interact with, each tagged with an id:
+
+```
+Page: http://internal.example.com/
+Title: Internal Tool Login
+
+- heading "Internal Tool Login" (level=1)
+- form
+  - text "Username"
+  - textbox "Username" [ref=e1]
+  - text "Password"
+  - textbox "Password" [ref=e2]
+  - button "Sign in" [ref=e3]
+```
+
+It then acts on those ids — type into `e1`, fill `e2` from your stored secret, click `e3`. After anything that changes the page it takes a fresh snapshot.
+
+**A safety detail worth knowing:** every snapshot is stamped with a token identifying that exact page. If the page navigates or reloads, ids from the old snapshot are **refused** rather than silently clicking whatever now happens to sit in that position. A wrong click on an internal system is the failure mode most worth preventing.
+
+### Two useful things to tell your agent
+
+- *"Take a screenshot"* — when you want to see what it sees.
+- *"Start a fresh session"* — clears all cookies and logs out of everything.
+
+---
+
+## Using it from the terminal
+
+Everything the agent can do, you can do by hand — useful for testing a flow before handing it over.
+
+```bash
+agentbrowser navigate internal.example.com
+agentbrowser snapshot
+```
+
+```
+- textbox "Username" [ref=e1]
+- textbox "Password" [ref=e2]
+- button "Sign in" [ref=e3]
+```
+
+```bash
+agentbrowser type e1 admin
+agentbrowser fill_credential e2 INTERNAL_APP_PASSWORD
+agentbrowser click e3
+agentbrowser snapshot
+```
+
+```
+- file-input "Attach document" [ref=e1] (single-file)
+- button "Upload document" [ref=e2]
+```
+
+```bash
+agentbrowser upload_file e1 ~/Documents/q3.pdf
+```
+
+```
+Set 1 file(s) on input [e1]: q3.pdf
+```
+
+```bash
+agentbrowser click e2
+agentbrowser close
+```
+
+**Commands share one browser session**, so the page stays put between them. `agentbrowser close` ends the session; it also closes itself after 30 minutes idle.
+
+Run `agentbrowser help` for everything, or `agentbrowser help upload_file` for one command.
+
+---
+
+## What it can do
+
+| Command | What it does |
+| --- | --- |
+| `navigate` `go_back` `go_forward` `reload` | Move around |
+| `snapshot` | Read the page as a list of elements with ids |
+| `screenshot` | Capture a PNG |
+| `get_text` | Pull out the readable text |
+| `click` `hover` `press_key` `scroll` | Interact |
+| `type` `select_option` `set_checked` | Fill in forms |
+| `fill_credential` | Type a stored password without revealing it |
+| `upload_file` | Attach files — the thing extensions can't do |
+| `list_downloads` | Files the site downloaded, and where they went |
+| `wait_for` | Wait for text, or for the page to settle |
+| `evaluate` | Run JavaScript on the page |
+| `list_tabs` `new_tab` `select_tab` `close_tab` | Tabs |
+| `list_secrets` | Names of stored logins (never values) |
+| `reset_session` | Log out of everything, clear cookies |
+
+`upload_file` handles both a plain upload field **and** the common design where a styled button opens a hidden picker. Pass whichever one the snapshot shows you — it works both ways.
+
+---
+
+## Troubleshooting
+
+### `agentbrowser: command not found`
+
+The install folder isn't on your PATH. Either open a new terminal (if the installer just added it), or add it yourself:
+
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && exec $SHELL
+```
+
+Your agent is unaffected by this — it uses the full path.
+
+### My agent doesn't see the browser tools
+
+1. **Restart it completely.** Tool configuration is only read at startup.
+2. Check the connection:
+   ```bash
+   claude mcp list
+   ```
+   You want `agentbrowser: … ✔ Connected`.
+3. If it's missing, reconnect and restart again:
+   ```bash
+   agentbrowser install-mcp
+   ```
+
+### `No usable Chromium found`
+
+Run `agentbrowser doctor` — you need at least one `✓` in the browsers list. If there are none, either:
 
 ```bash
 agentbrowser install-browser
 ```
 
-If that fails (the compiled binary cannot always spawn Playwright's downloader), either install Google Chrome — it is picked up automatically — or run `npx playwright@1.62.1 install chromium`.
+or simply **install Google Chrome** — agentBrowser picks it up automatically, no configuration needed.
 
-To register with your agents manually:
+### I downloaded the file and double-clicked it, but macOS blocked it
 
-```bash
-agentbrowser install-mcp
-```
+Expected. macOS blocks apps that arrive through a browser, Slack, or AirDrop unless they've been notarized by Apple. **Use the [install command](#step-1--run-the-installer) instead** — downloading with `curl` avoids the block completely.
 
-## Exporting a binary
-
-Binaries are **never committed** — `build/` is gitignored. They are built on demand and distributed as files.
+If you must use a file you already downloaded, clear the flag first:
 
 ```bash
-npm run compile
+xattr -d com.apple.quarantine ~/Downloads/agentbrowser-darwin-arm64
+chmod +x ~/Downloads/agentbrowser-darwin-arm64
+~/Downloads/agentbrowser-darwin-arm64
 ```
 
-Produces, in `build/`:
+That last line installs it — the binary installs itself when you run it from outside its install folder.
 
-| File | For |
+### "Refs are stale" or "call snapshot again"
+
+Working as intended. The page changed, so the old element ids no longer describe it. Take a fresh snapshot. Agents handle this on their own.
+
+### The agent clicked the wrong thing
+
+Take a screenshot to see the page as it is, then a fresh snapshot. If an element never shows up in the snapshot, it may be inside an iframe — those appear in a separate section with ids like `f1e5`.
+
+### Something went wrong and I want to see what it did
+
+```bash
+agentbrowser audit 50
+```
+
+Every action, in order:
+
+```
+{"ts":"2026-08-07T12:42:01.113Z","action":"upload_file","via":"cli","args":{"ref":"e1","paths":["/tmp/q3-report.txt"]},"ok":true,"ms":32}
+```
+
+Passwords never appear here — see [Where your data lives](#where-your-data-lives).
+
+### Starting over
+
+```bash
+agentbrowser close          # end the browser session
+agentbrowser reset_session  # or just drop all cookies and logins
+```
+
+---
+
+## Updating
+
+Re-run the install command. It replaces the binary in place and keeps your stored logins and settings:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ig-shadow-walker/agentBrowser/main/scripts/install.sh | bash
+```
+
+Restart your agent afterwards.
+
+---
+
+## Uninstalling
+
+```bash
+agentbrowser uninstall
+```
+
+Removes the program and disconnects it from Claude Code and Codex. **Your stored logins and logs are deliberately kept** in case you reinstall. To delete those too:
+
+```bash
+rm -rf ~/Library/Application\ Support/agentbrowser
+```
+
+---
+
+## Where your data lives
+
+Everything stays on your Mac. There is no server, no account, and no telemetry.
+
+| What | Where |
 | --- | --- |
-| `agentbrowser-darwin-arm64` | Apple Silicon |
-| `agentbrowser-darwin-x64` | Intel Macs |
-| `SHA256SUMS` | Checksums the installer verifies |
+| Stored logins | `~/Library/Application Support/agentbrowser/secrets.json` (owner-only, mode `0600`) |
+| Activity log | `~/Library/Application Support/agentbrowser/audit.log` |
+| Downloads | `~/Library/Application Support/agentbrowser/downloads/` |
+| Screenshots | `~/Library/Application Support/agentbrowser/screenshots/` |
 
-Both are cross-compiled from whichever Mac you build on, and each is fully self-contained — the recipient needs no Node.js and no checkout.
+**On passwords.** Stored values are read only by the browser engine and typed straight into the page. They are never returned to the agent, never written to the log, and passwords already typed into a field show as `«hidden»` in snapshots. If a password somehow reaches a log field anyway, it's replaced with `«redacted»` — the log is scrubbed against every value you've stored.
 
-### Handing one to someone directly
+**On sessions.** Each session starts with no cookies and nothing saved, so every task logs in fresh and nothing carries over between tasks. Nothing is written to a browser profile on disk.
 
-Copy the file across, then:
+**Worth being clear about:** an agent driving this browser can do anything *you* could do while logged in. Give it credentials scoped to the task, not your admin account.
+
+---
+
+## For developers
+
+### Build and test
 
 ```bash
-chmod +x agentbrowser-darwin-arm64
-xattr -d com.apple.quarantine agentbrowser-darwin-arm64   # only if it arrived via a browser or Slack
-mv agentbrowser-darwin-arm64 ~/.local/bin/agentbrowser
-agentbrowser install-mcp
+npm install
+npx playwright install chromium
+
+npm run build          # TypeScript -> dist/
+npm test               # both suites against the dev build
+npm run compile        # standalone binaries -> build/
+npm run test:binary    # all three suites against the compiled binary
 ```
 
-The quarantine step matters: the binary is ad-hoc signed but not notarized, so anything that sets the quarantine flag (browsers, Slack, AirDrop) will make Gatekeeper block it. `curl` and `scp` do not set it.
+Three suites, all running against a fixture "internal app" with a login form and two upload paths:
 
-### Publishing a release
+| Suite | Covers |
+| --- | --- |
+| `test/smoke.mjs` | The engine through the CLI — login, both upload styles, stale-ref refusal, audit redaction |
+| `test/mcp-smoke.mjs` | The MCP wiring an agent sees — tool discovery, content blocks, error recovery |
+| `test/install-smoke.mjs` | Download → run → installed → registered → uninstall, in a sandboxed `HOME` |
+
+### Releasing
+
+Binaries are never committed — `build/` is gitignored. They ship as GitHub Release assets, which live outside the repo.
 
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-CI builds both architectures, runs both test suites **against the compiled binary**, and attaches the files to a GitHub Release. Release assets live outside the repo, so nothing binary ever enters git history. Users then install with the one-liner at the top of this README.
-
-To publish without CI:
+CI builds both architectures, runs all three suites **against the compiled binary**, and attaches the files to a Release. Without CI:
 
 ```bash
 npm run compile
 gh release create v0.1.0 build/agentbrowser-darwin-* build/SHA256SUMS --generate-notes
 ```
 
-## Development
+To test `install.sh` without publishing anything, point it at a local server:
 
 ```bash
-npm install
-npx playwright install chromium
-npm run build          # TypeScript -> dist/
-npm test               # both suites against the dev build
-npm run compile        # standalone binaries -> build/
-npm run test:binary    # both suites against the compiled binary
+AGENTBROWSER_BASE_URL="http://127.0.0.1:8123" bash scripts/install.sh
 ```
-
-The test fixture in `test/fixture-server.mjs` is a miniature internal app with a login form and two upload paths, including the hidden-input pattern. Both suites run against the compiled binary in CI so packaging regressions fail the release.
 
 ### Layout
 
 ```
-src/core/      engine — session, snapshot/refs, secrets, audit, browser launch
-src/core/actions.ts   every action, defined once, driving both front-ends
-src/mcp/       MCP stdio server
-src/cli/       CLI, session daemon, unix-socket protocol
-src/install/   MCP registration for Claude Code and Codex
+src/core/            engine — session, snapshot/refs, secrets, audit, browser launch
+src/core/actions.ts  every action, defined once, driving both front-ends
+src/mcp/             MCP stdio server
+src/cli/             CLI, session daemon, unix-socket protocol
+src/install/         self-install and agent registration
 ```
 
-Actions are declared once in `src/core/actions.ts` with a zod schema. The MCP server turns each into a tool and the CLI turns each into a subcommand, so the two cannot drift apart.
+Every action is declared once in `src/core/actions.ts` with a zod schema. The MCP server turns each into a tool and the CLI turns each into a subcommand, so the two can't drift apart.
 
-## Security notes
+### Notes for future work
 
-- Runs entirely on your machine. No server, no telemetry, no remote component.
-- Credentials are read only by the engine and are never returned to the agent.
-- The audit log records every action with secret values stripped.
-- The binary is ad-hoc signed, not notarized. The installer strips the quarantine attribute so Gatekeeper does not block it.
-- An agent driving this browser can do anything you can do while logged in. Give it credentials scoped to what the task needs.
+- **Double-click install** needs an Apple Developer account ($99/yr) plus signing and notarization in the release workflow. The self-install code already supports it — only the signature is missing.
+- **Windows and Linux** would need their own build targets and install paths; the engine itself is portable.
+- **Playwright's own browser downloader** can't run inside the compiled binary (it forks a helper that isn't on disk), which is why `install-browser` falls back to `npx playwright install` and then to a system Chrome.

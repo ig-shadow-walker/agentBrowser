@@ -44,6 +44,10 @@ jobs:
       - name: Smoke test (MCP)
         run: AGENTBROWSER_BIN="$PWD/build/agentbrowser-darwin-arm64" node test/mcp-smoke.mjs
 
+      # The download-and-run path users actually take, in a sandboxed HOME.
+      - name: Smoke test (install flow)
+        run: node test/install-smoke.mjs
+
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
