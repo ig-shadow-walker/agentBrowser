@@ -5,6 +5,12 @@ release/
 *.tgz
 .DS_Store
 
+# Compiled binaries are never committed — they ship as GitHub Release assets,
+# which live outside the repo. Belt and braces in case one is built elsewhere.
+agentbrowser
+agentbrowser-darwin-*
+SHA256SUMS
+
 # Never commit local credentials or captured browser state.
 secrets.json
 .env

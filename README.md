@@ -130,15 +130,62 @@ To register with your agents manually:
 agentbrowser install-mcp
 ```
 
+## Exporting a binary
+
+Binaries are **never committed** — `build/` is gitignored. They are built on demand and distributed as files.
+
+```bash
+npm run compile
+```
+
+Produces, in `build/`:
+
+| File | For |
+| --- | --- |
+| `agentbrowser-darwin-arm64` | Apple Silicon |
+| `agentbrowser-darwin-x64` | Intel Macs |
+| `SHA256SUMS` | Checksums the installer verifies |
+
+Both are cross-compiled from whichever Mac you build on, and each is fully self-contained — the recipient needs no Node.js and no checkout.
+
+### Handing one to someone directly
+
+Copy the file across, then:
+
+```bash
+chmod +x agentbrowser-darwin-arm64
+xattr -d com.apple.quarantine agentbrowser-darwin-arm64   # only if it arrived via a browser or Slack
+mv agentbrowser-darwin-arm64 ~/.local/bin/agentbrowser
+agentbrowser install-mcp
+```
+
+The quarantine step matters: the binary is ad-hoc signed but not notarized, so anything that sets the quarantine flag (browsers, Slack, AirDrop) will make Gatekeeper block it. `curl` and `scp` do not set it.
+
+### Publishing a release
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+CI builds both architectures, runs both test suites **against the compiled binary**, and attaches the files to a GitHub Release. Release assets live outside the repo, so nothing binary ever enters git history. Users then install with the one-liner at the top of this README.
+
+To publish without CI:
+
+```bash
+npm run compile
+gh release create v0.1.0 build/agentbrowser-darwin-* build/SHA256SUMS --generate-notes
+```
+
 ## Development
 
 ```bash
 npm install
 npx playwright install chromium
 npm run build          # TypeScript -> dist/
-node test/smoke.mjs    # end-to-end against a fixture internal app
-node test/mcp-smoke.mjs
+npm test               # both suites against the dev build
 npm run compile        # standalone binaries -> build/
+npm run test:binary    # both suites against the compiled binary
 ```
 
 The test fixture in `test/fixture-server.mjs` is a miniature internal app with a login form and two upload paths, including the hidden-input pattern. Both suites run against the compiled binary in CI so packaging regressions fail the release.

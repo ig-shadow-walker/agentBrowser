@@ -29,7 +29,7 @@ function hasCommand(command: string): boolean {
   }
 }
 
-export function registerClaudeCode(binPath: string): RegistrationResult {
+export function registerClaudeCode(command: string, args: string[]): RegistrationResult {
   const target = "Claude Code";
 
   if (hasCommand("claude")) {
@@ -42,18 +42,18 @@ export function registerClaudeCode(binPath: string): RegistrationResult {
       /* `mcp list` can fail on older versions; fall through to add */
     }
     try {
-      execFileSync("claude", ["mcp", "add", SERVER_NAME, "--scope", "user", "--", binPath, "mcp"], { stdio: "pipe" });
+      execFileSync("claude", ["mcp", "add", SERVER_NAME, "--scope", "user", "--", command, ...args], { stdio: "pipe" });
       return { target, status: "added", detail: "Registered via `claude mcp add` (user scope)." };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      return fallbackClaudeJson(binPath, `\`claude mcp add\` failed (${message.split("\n")[0]}); wrote config directly.`);
+      return fallbackClaudeJson(command, args, `\`claude mcp add\` failed (${message.split("\n")[0]}); wrote config directly.`);
     }
   }
 
-  return fallbackClaudeJson(binPath, "`claude` CLI not found; wrote config directly.");
+  return fallbackClaudeJson(command, args, "`claude` CLI not found; wrote config directly.");
 }
 
-function fallbackClaudeJson(binPath: string, note: string): RegistrationResult {
+function fallbackClaudeJson(command: string, args: string[], note: string): RegistrationResult {
   const target = "Claude Code";
   const configPath = path.join(os.homedir(), ".claude.json");
   try {
@@ -66,7 +66,7 @@ function fallbackClaudeJson(binPath: string, note: string): RegistrationResult {
     if (servers[SERVER_NAME]) {
       return { target, status: "already-present", detail: `"${SERVER_NAME}" already present in ${configPath}.` };
     }
-    servers[SERVER_NAME] = { command: binPath, args: ["mcp"] };
+    servers[SERVER_NAME] = { command, args };
     config.mcpServers = servers;
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
     return { target, status: "added", detail: `${note} (${configPath})` };
@@ -79,12 +79,12 @@ function fallbackClaudeJson(binPath: string, note: string): RegistrationResult {
   }
 }
 
-export function registerCodex(binPath: string): RegistrationResult {
+export function registerCodex(command: string, args: string[]): RegistrationResult {
   const target = "Codex";
 
   if (hasCommand("codex")) {
     try {
-      execFileSync("codex", ["mcp", "add", SERVER_NAME, "--", binPath, "mcp"], { stdio: "pipe" });
+      execFileSync("codex", ["mcp", "add", SERVER_NAME, "--", command, ...args], { stdio: "pipe" });
       return { target, status: "added", detail: "Registered via `codex mcp add`." };
     } catch {
       /* older codex builds have no `mcp add`; fall through to TOML */
@@ -101,8 +101,8 @@ export function registerCodex(binPath: string): RegistrationResult {
     const block = [
       "",
       `[mcp_servers.${SERVER_NAME}]`,
-      `command = ${JSON.stringify(binPath)}`,
-      `args = ["mcp"]`,
+      `command = ${JSON.stringify(command)}`,
+      `args = [${args.map((a) => JSON.stringify(a)).join(", ")}]`,
       "",
     ].join("\n");
     fs.appendFileSync(configPath, (existing.endsWith("\n") || !existing ? "" : "\n") + block);
@@ -116,6 +116,19 @@ export function registerCodex(binPath: string): RegistrationResult {
   }
 }
 
-export function registerAll(binPath: string): RegistrationResult[] {
-  return [registerClaudeCode(binPath), registerCodex(binPath)];
+export function registerAll(command: string, args: string[]): RegistrationResult[] {
+  return [registerClaudeCode(command, args), registerCodex(command, args)];
+}
+
+/**
+ * How this process should be re-launched as an MCP server.
+ *
+ * Compiled, the binary is its own entry point. From source, the entry point is
+ * node plus the script path — registering the script alone would hand the agent
+ * a file it cannot execute.
+ */
+export function selfInvocation(): { command: string; args: string[] } {
+  const script = process.argv[1];
+  const fromScript = script?.endsWith(".js") ?? false;
+  return fromScript ? { command: process.execPath, args: [script!, "mcp"] } : { command: process.execPath, args: ["mcp"] };
 }

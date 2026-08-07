@@ -10,7 +10,7 @@ import { parseArgs, usageFor } from "./cli/args.js";
 import { send, isDaemonRunning } from "./cli/client.js";
 import { startDaemon } from "./cli/daemon.js";
 import { startMcpServer } from "./mcp/server.js";
-import { registerAll } from "./install/register.js";
+import { registerAll, selfInvocation } from "./install/register.js";
 import { VERSION, PLAYWRIGHT_VERSION } from "./version.js";
 
 function out(text: string): void {
@@ -210,12 +210,9 @@ async function main(): Promise<void> {
 
     case "install-mcp": {
       ensureConfigDir();
-      const binPath = process.execPath.endsWith("node") ? `${process.execPath} ${process.argv[1]}` : process.execPath;
-      if (binPath.includes(" ")) {
-        out(`Note: running from source, registering "${binPath}".`);
-      }
-      const results = registerAll(process.execPath.endsWith("node") ? (process.argv[1] ?? process.execPath) : process.execPath);
-      for (const r of results) {
+      const { command: cmd, args } = selfInvocation();
+      out(`Registering: ${[cmd, ...args].join(" ")}\n`);
+      for (const r of registerAll(cmd, args)) {
         const mark = r.status === "added" ? "✓" : r.status === "already-present" ? "•" : "✗";
         out(`${mark} ${r.target}: ${r.detail}`);
       }
