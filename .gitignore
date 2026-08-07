@@ -1,0 +1,13 @@
+node_modules/
+dist/
+build/
+release/
+*.tgz
+.DS_Store
+
+# Never commit local credentials or captured browser state.
+secrets.json
+.env
+.env.*
+!.env.example
+*.log

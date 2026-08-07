@@ -1,0 +1,56 @@
+name: Release
+
+# Tag a version to publish binaries:  git tag v0.1.0 && git push origin v0.1.0
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to publish (e.g. v0.1.0)"
+        required: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium for tests
+        run: npx playwright install chromium
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Build binaries
+        run: bash scripts/build.sh
+
+      # Exercise the shipped artifact, not a dev build, so a packaging
+      # regression fails the release rather than reaching users.
+      - name: Smoke test (CLI)
+        run: AGENTBROWSER_BIN="$PWD/build/agentbrowser-darwin-arm64" node test/smoke.mjs
+
+      - name: Smoke test (MCP)
+        run: AGENTBROWSER_BIN="$PWD/build/agentbrowser-darwin-arm64" node test/mcp-smoke.mjs
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          draft: false
+          generate_release_notes: true
+          files: |
+            build/agentbrowser-darwin-arm64
+            build/agentbrowser-darwin-x64
+            build/SHA256SUMS
