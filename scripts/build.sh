@@ -6,6 +6,10 @@
 #
 #   * chromium-bidi is marked external — Playwright only requires it lazily for
 #     the Firefox/WebKit BiDi transports, which we never use.
+#   * fsevents is marked external — it is an optional macOS native module used
+#     for file watching, which we never do. Left in, Bun emits it as a separate
+#     .node asset, and the bundle step then fails with "cannot write multiple
+#     output files without an output directory".
 #   * playwright-core locates its own package.json and browsers.json relative to
 #     __dirname, which Bun bakes in as the build machine's path. We build to an
 #     intermediate bundle, redirect that lookup (scripts/patch-bundle.mjs), then
@@ -29,9 +33,13 @@ rm -rf "$OUT_DIR"
 mkdir -p "$WORK_DIR"
 
 BUNDLE="$WORK_DIR/bundle.js"
+# --outfile (not --outdir) on purpose: if a future dependency introduces another
+# native asset, this fails loudly here rather than silently producing a binary
+# that is missing a file at runtime.
 npx bun build src/index.ts \
   --target=bun \
   --external chromium-bidi \
+  --external fsevents \
   --outfile "$BUNDLE" \
   >/dev/null
 
@@ -46,6 +54,7 @@ for target in "${TARGETS[@]}"; do
     --compile \
     --target="bun-$target" \
     --external chromium-bidi \
+    --external fsevents \
     --outfile "$output" \
     >/dev/null
   chmod +x "$output"
