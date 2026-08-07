@@ -30,8 +30,11 @@ jobs:
       - name: Install Chromium for tests
         run: npx playwright install chromium
 
+      # `npm run`, not `npx tsc` — the pretypecheck hook generates
+      # src/generated/playwrightAssets.ts, which is gitignored and so absent
+      # from a fresh checkout.
       - name: Typecheck
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
       - name: Build binaries
         run: bash scripts/build.sh
