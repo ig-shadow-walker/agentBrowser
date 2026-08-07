@@ -8,13 +8,15 @@
     "agentbrowser": "./dist/index.js"
   },
   "scripts": {
+    "prebuild": "node scripts/gen-assets.mjs",
     "build": "tsc",
+    "pretypecheck": "node scripts/gen-assets.mjs",
     "typecheck": "tsc --noEmit",
     "dev": "tsc --watch",
     "compile": "bash scripts/build.sh",
     "start": "node dist/index.js",
     "test": "npm run build && node test/smoke.mjs && node test/mcp-smoke.mjs",
-    "test:binary": "AGENTBROWSER_BIN=\"$PWD/build/agentbrowser-darwin-arm64\" node test/smoke.mjs && AGENTBROWSER_BIN=\"$PWD/build/agentbrowser-darwin-arm64\" node test/mcp-smoke.mjs && node test/install-smoke.mjs"
+    "test:binary": "AGENTBROWSER_BIN=\"$PWD/build/agentbrowser-darwin-arm64\" node test/smoke.mjs && AGENTBROWSER_BIN=\"$PWD/build/agentbrowser-darwin-arm64\" node test/mcp-smoke.mjs && node test/install-smoke.mjs && node test/standalone-smoke.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",

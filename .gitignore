@@ -17,3 +17,4 @@ secrets.json
 .env.*
 !.env.example
 *.log
+src/generated/

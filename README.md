@@ -425,6 +425,17 @@ Three suites, all running against a fixture "internal app" with a login form and
 | `test/smoke.mjs` | The engine through the CLI — login, both upload styles, stale-ref refusal, audit redaction |
 | `test/mcp-smoke.mjs` | The MCP wiring an agent sees — tool discovery, content blocks, error recovery |
 | `test/install-smoke.mjs` | Download → run → installed → registered → uninstall, in a sandboxed `HOME` |
+| `test/standalone-smoke.mjs` | The binary with `playwright-core` hidden — proves it is genuinely self-contained |
+
+`standalone-smoke.mjs` earns its place. Every other suite runs on the build machine, where `playwright-core` sits at exactly the absolute path Bun baked into the binary — so a lookup that fails on every other machine succeeds there. A release shipped broken this way once. Never remove this test.
+
+### How the binary stays self-contained
+
+`playwright-core` finds its own `package.json` and `browsers.json` with `require(path.join(__dirname, ".."))`. Bun compiles `__dirname` to the build machine's absolute path and cannot bundle a computed `require`, so both lookups fail elsewhere. Three pieces fix it:
+
+- `scripts/gen-assets.mjs` embeds both files into the source at build time
+- `scripts/patch-bundle.mjs` redirects the lookup to `AGENTBROWSER_PW_ROOT`, and **fails the build** if Playwright's internals change so the patch stops matching
+- `src/runtime-shim.ts` writes the embedded copies out at startup, before anything imports Playwright
 
 ### Releasing
 

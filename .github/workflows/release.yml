@@ -48,6 +48,12 @@ jobs:
       - name: Smoke test (install flow)
         run: node test/install-smoke.mjs
 
+      # Runs the binary with playwright-core hidden, which is what every user's
+      # machine looks like. Without this a binary that only works on the build
+      # machine passes every other check.
+      - name: Smoke test (standalone — no node_modules)
+        run: node test/standalone-smoke.mjs
+
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:

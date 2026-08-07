@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+// MUST come first: gives the bundled Playwright a real directory to find its
+// package.json and browsers.json in. ES module evaluation follows import order,
+// so this runs before anything pulls Playwright in. See src/runtime-shim.ts.
+import "./runtime-shim.js";
+
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
 import { ACTIONS, ACTIONS_BY_NAME } from "./core/actions.js";
