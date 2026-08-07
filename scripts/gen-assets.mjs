@@ -31,6 +31,31 @@ for (const name of NEEDED) {
 
 const version = JSON.parse(assets["package.json"]).version;
 
+// Three places record a version, and a mismatch is invisible until a user hits
+// it — a binary reporting the wrong version, or an install-browser hint naming
+// a Playwright release that was never bundled. Fail the build instead.
+{
+  const ourPkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
+  const versionTs = fs.readFileSync(path.join(ROOT, "src", "version.ts"), "utf8");
+  const declared = (re) => re.exec(versionTs)?.[1];
+
+  const problems = [];
+  const ourVersion = declared(/VERSION\s*=\s*"([^"]+)"/);
+  if (ourVersion !== ourPkg.version) {
+    problems.push(`package.json version ${ourPkg.version} != src/version.ts VERSION ${ourVersion}`);
+  }
+
+  const declaredPw = declared(/PLAYWRIGHT_VERSION\s*=\s*"([^"]+)"/);
+  if (declaredPw !== version) {
+    problems.push(`src/version.ts PLAYWRIGHT_VERSION ${declaredPw} != installed playwright-core ${version}`);
+  }
+
+  if (problems.length) {
+    console.error("gen-assets: version mismatch —\n  " + problems.join("\n  "));
+    process.exit(1);
+  }
+}
+
 fs.mkdirSync(OUT_DIR, { recursive: true });
 fs.writeFileSync(
   OUT,
