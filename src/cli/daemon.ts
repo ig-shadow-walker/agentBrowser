@@ -13,6 +13,7 @@ import { createLineReader, writeMessage, type Request } from "./protocol.js";
  * first use, exits when idle, and is what `agentbrowser close` shuts down.
  */
 
+/** 0 (or less) means never time out — used when running as a login agent. */
 const IDLE_TIMEOUT_MS = Number(process.env.AGENTBROWSER_IDLE_TIMEOUT_MS ?? 30 * 60 * 1000);
 
 export async function startDaemon(): Promise<void> {
@@ -43,6 +44,7 @@ export async function startDaemon(): Promise<void> {
 
   const resetIdle = () => {
     if (idleTimer) clearTimeout(idleTimer);
+    if (IDLE_TIMEOUT_MS <= 0) return; // resident: launchd owns the lifetime
     idleTimer = setTimeout(() => void shutdown("idle"), IDLE_TIMEOUT_MS);
     idleTimer.unref();
   };

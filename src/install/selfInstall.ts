@@ -225,6 +225,18 @@ export async function runUninstall(): Promise<void> {
   say(bold("  Uninstalling agentBrowser"));
   say();
 
+  // Remove the login agent first — leaving it behind would have launchd
+  // repeatedly try to respawn a binary that no longer exists.
+  try {
+    const { disableAutostart, autostartStatus } = await import("./autostart.js");
+    if (!autostartStatus()[0]?.includes("off")) {
+      disableAutostart();
+      ok("Removed the login agent");
+    }
+  } catch {
+    /* nothing installed */
+  }
+
   for (const dir of INSTALL_DIRS) {
     const target = path.join(dir, BIN_NAME);
     if (!fs.existsSync(target)) continue;

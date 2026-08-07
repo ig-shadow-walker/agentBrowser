@@ -14,6 +14,7 @@
 - [Using it from Claude Code or Codex](#using-it-from-claude-code-or-codex)
 - [Using it from the terminal](#using-it-from-the-terminal)
 - [What it can do](#what-it-can-do)
+- [Does it need to run in the background?](#does-it-need-to-run-in-the-background)
 - [Troubleshooting](#troubleshooting)
 - [Updating](#updating)
 - [Uninstalling](#uninstalling)
@@ -151,11 +152,43 @@ agentbrowser: /Users/you/.local/bin/agentbrowser mcp - ✔ Connected
 
 Do this **before** asking an agent to log into anything. Passwords you store here never reach the agent — it only ever sees the *name* you gave them.
 
+### The command
+
 ```bash
-agentbrowser secrets set INTERNAL_APP_PASSWORD 'your-actual-password'
+agentbrowser secrets set <NAME> '<value>'
 ```
 
-Use single quotes so special characters survive. Check what you've stored:
+- `<NAME>` — a label you choose. Uppercase with underscores by convention. This is what you tell the agent.
+- `<value>` — the actual secret. **Always wrap it in single quotes** so `$`, `!`, spaces and other shell characters survive intact.
+
+### Copy-paste template
+
+```bash
+# One login = two secrets (username is not sensitive, but storing it is tidier)
+agentbrowser secrets set ACME_ADMIN_USER     'admin@acme.com'
+agentbrowser secrets set ACME_ADMIN_PASSWORD 'your-password-here'
+
+# An API token or key
+agentbrowser secrets set ACME_API_TOKEN      'sk-live-xxxxxxxxxxxx'
+
+# A second environment, kept separate
+agentbrowser secrets set ACME_STAGING_PASSWORD 'staging-password'
+
+# Check what is stored (names only — values are never printed)
+agentbrowser secrets list
+
+# Remove one
+agentbrowser secrets rm ACME_STAGING_PASSWORD
+```
+
+Then tell your agent the **name**, never the value:
+
+> Log into acme.com with `ACME_ADMIN_USER` and `ACME_ADMIN_PASSWORD`, then upload `~/Documents/q3.pdf` to Reports.
+
+> **If your password contains a single quote**, use double quotes and escape any `$`, `` ` `` or `\`:
+> `agentbrowser secrets set MY_PW "it's-a-p\$ssword"`
+
+Check what you've stored:
 
 ```bash
 agentbrowser secrets list
@@ -358,6 +391,39 @@ agentbrowser reset_session  # or just drop all cookies and logins
 ```
 
 ---
+
+## Does it need to run in the background?
+
+**No. There is nothing to start, and nothing runs when you are not using it.**
+
+- **For Claude Code and Codex** — they launch their own `agentbrowser` process when they start, and shut it down when they quit. Nothing for you to manage.
+- **For the terminal** — the first `agentbrowser` command starts a session automatically. It exits on its own after 30 minutes idle, or immediately on `agentbrowser close`.
+
+Idle, agentBrowser uses **zero** memory — no process, no browser. Chromium only launches on the first page action (about 270MB, plus 126MB for the session) and is freed on `close`.
+
+### Starting it at login anyway
+
+If you would rather the terminal session daemon be resident:
+
+```bash
+agentbrowser autostart on      # start at login
+agentbrowser autostart status  # check
+agentbrowser autostart off     # stop and remove
+```
+
+This installs a macOS LaunchAgent at `~/Library/LaunchAgents/com.agentbrowser.daemon.plist`, with `KeepAlive` so it comes back if it ever dies. The resident daemon never times out.
+
+**Most people should leave this off.** What it costs versus what it buys:
+
+| | Autostart off (default) | Autostart on |
+| --- | --- | --- |
+| Memory when unused | 0 MB | ~120 MB, always |
+| First terminal command | ~1–2s slower | instant |
+| Claude Code / Codex | no difference | no difference |
+
+The daemon holds no browser either way — that ~120 MB is the runtime itself, resident whether you use it that day or not. It buys a second or two on the first CLI command and nothing for your agent, which starts its own process regardless.
+
+`agentbrowser uninstall` removes the login agent automatically.
 
 ## Updating
 

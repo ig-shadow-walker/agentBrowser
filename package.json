@@ -1,6 +1,6 @@
 {
   "name": "agentbrowser",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "An unrestricted headless browser tool for coding agents (Claude Code, Codex). MCP server + CLI.",
   "type": "module",
   "private": true,
