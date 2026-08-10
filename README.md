@@ -495,6 +495,8 @@ Three suites, all running against a fixture "internal app" with a login form and
 
 `standalone-smoke.mjs` earns its place. Every other suite runs on the build machine, where `playwright-core` sits at exactly the absolute path Bun baked into the binary — so a lookup that fails on every other machine succeeds there. A release shipped broken this way once. Never remove this test.
 
+`scripts/release.sh` runs all four in a clean clone before it will publish anything.
+
 ### How the binary stays self-contained
 
 `playwright-core` finds its own `package.json` and `browsers.json` with `require(path.join(__dirname, ".."))`. Bun compiles `__dirname` to the build machine's absolute path and cannot bundle a computed `require`, so both lookups fail elsewhere. Three pieces fix it:
@@ -507,17 +509,23 @@ Three suites, all running against a fixture "internal app" with a login form and
 
 Binaries are never committed — `build/` is gitignored. They ship as GitHub Release assets, which live outside the repo.
 
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-CI builds both architectures, runs all three suites **against the compiled binary**, and attaches the files to a Release. Without CI:
+There is no CI. One command does everything:
 
 ```bash
-npm run compile
-gh release create v0.1.0 build/agentbrowser-darwin-* build/SHA256SUMS --generate-notes
+bash scripts/release.sh 0.1.3
 ```
+
+It refuses to publish unless every check passes:
+
+1. **Preflight** — `gh` authenticated, on `main`, clean tree, in sync with origin, tag and release both free
+2. **Version** — sets `package.json` and `src/version.ts`, commits
+3. **Clean-room build** — clones to a temp dir, `npm ci`, builds there
+4. **Tests** — all four suites against the binaries being shipped
+5. **Publish** — only now does it tag, push, and upload assets
+
+Nothing is pushed or published until step 4 passes. If a suite fails you are left with a local version-bump commit and nothing else; `git reset --soft HEAD~1` undoes it.
+
+**Step 3 is the important one.** Both releases that shipped broken did so because the artifact was built in a working tree containing files a fresh `npm ci` does not produce — once a stale `playwright-core` path, once a missing `fsevents`. Building in a throwaway clone is what catches that class of bug. Do not "optimise" it away by building in place.
 
 To test `install.sh` without publishing anything, point it at a local server:
 
