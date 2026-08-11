@@ -31,19 +31,29 @@ for (const name of NEEDED) {
 
 const version = JSON.parse(assets["package.json"]).version;
 
-// Three places record a version, and a mismatch is invisible until a user hits
-// it — a binary reporting the wrong version, or an install-browser hint naming
-// a Playwright release that was never bundled. Fail the build instead.
+// Five files record the product version, and a mismatch is invisible until a
+// user hits it — a binary reporting the wrong version, a DMG whose filename
+// disagrees with its contents, or an install-browser hint naming a Playwright
+// release that was never bundled. Fail the build instead of shipping the drift.
 {
-  const ourPkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
-  const versionTs = fs.readFileSync(path.join(ROOT, "src", "version.ts"), "utf8");
+  const read = (...parts) => fs.readFileSync(path.join(ROOT, ...parts), "utf8");
+  const jsonVersion = (...parts) => JSON.parse(read(...parts)).version;
+
+  const versionTs = read("src", "version.ts");
   const declared = (re) => re.exec(versionTs)?.[1];
 
-  const problems = [];
-  const ourVersion = declared(/VERSION\s*=\s*"([^"]+)"/);
-  if (ourVersion !== ourPkg.version) {
-    problems.push(`package.json version ${ourPkg.version} != src/version.ts VERSION ${ourVersion}`);
-  }
+  const expected = jsonVersion("package.json");
+  const recorded = {
+    "package.json": expected,
+    "src/version.ts": declared(/VERSION\s*=\s*"([^"]+)"/),
+    "app/package.json": jsonVersion("app", "package.json"),
+    "app/src-tauri/tauri.conf.json": jsonVersion("app", "src-tauri", "tauri.conf.json"),
+    "app/src-tauri/Cargo.toml": /^version = "([^"]+)"$/m.exec(read("app", "src-tauri", "Cargo.toml"))?.[1],
+  };
+
+  const problems = Object.entries(recorded)
+    .filter(([, v]) => v !== expected)
+    .map(([file, v]) => `${file} says ${v ?? "(unreadable)"}, expected ${expected}`);
 
   const declaredPw = declared(/PLAYWRIGHT_VERSION\s*=\s*"([^"]+)"/);
   if (declaredPw !== version) {
@@ -51,9 +61,17 @@ const version = JSON.parse(assets["package.json"]).version;
   }
 
   if (problems.length) {
-    console.error("gen-assets: version mismatch —\n  " + problems.join("\n  "));
+    console.error(
+      [
+        "gen-assets: version mismatch —",
+        ...problems.map((p) => `  ${p}`),
+        "",
+        `Set every file to the same version (package.json is the reference: ${expected}).`,
+      ].join("\n"),
+    );
     process.exit(1);
   }
+  console.log(`gen-assets: version ${expected} consistent across ${Object.keys(recorded).length} files`);
 }
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
