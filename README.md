@@ -138,6 +138,8 @@ Three further precautions, because one layer isn't enough:
 
 Stored at `~/Library/Application Support/agentbrowser/secrets.json`, mode `0600`. Nothing leaves your machine.
 
+> **The store is plaintext, not the Keychain.** `0600` keeps out other user accounts, not other processes running as you. See [Security](#security) for what that does and does not protect — including the one thing an agent can still do with a credential it cannot read.
+
 ---
 
 ## Every action
@@ -269,11 +271,65 @@ This runs against real internal systems with real credentials. The log is how yo
 
 ## Security
 
-- **Entirely local.** No server, no account, no telemetry, no remote component.
-- **Signed and notarized** with a Developer ID, hardened runtime enabled.
-- **Credentials are read only by the engine** and never returned to the agent.
-- **The audit log is scrubbed** against every stored secret value.
-- **An agent driving this browser can do anything you could do while logged in.** Give it credentials scoped to the task, not your admin account. That's the real threat model, and no amount of engineering here changes it.
+This tool holds real passwords for real internal systems and hands a browser to a language model. It's worth being precise about what that does and doesn't protect.
+
+### How a password travels
+
+```mermaid
+flowchart LR
+    S["secrets.json<br/><code>0600</code>, local only"]
+    E["agentBrowser<br/>engine"]
+    P["the login field<br/>on the page"]
+    A["your agent's<br/>context"]
+
+    A -- "① asks by name<br/><code>fill_credential(e2, ADMIN_PASSWORD)</code>" --> E
+    S -- "② engine reads the value" --> E
+    E -- "③ types it straight in" --> P
+    E -. "✗ value never returned" .-> A
+
+    style A fill:#2d2d33,stroke:#888,color:#eee
+    style S fill:#1f3a24,stroke:#2aa146,color:#eee
+    style E fill:#1e2f45,stroke:#2997ff,color:#eee
+    style P fill:#2d2d33,stroke:#888,color:#eee
+```
+
+The agent names a secret; it never receives one. All it gets back is a confirmation:
+
+```
+Filled input "Password" [e2] with secret "ADMIN_PASSWORD" (value not shown).
+```
+
+### What is protected
+
+| | |
+| --- | --- |
+| **Agent context** | Values are never returned by any action, so they can't reach the transcript, a model provider, or a log of the conversation. |
+| **Snapshots** | A password already typed into a field reads back as `«hidden»`, so it can't leak through a later `snapshot`. |
+| **Audit log** | Scrubbed against every stored value, so a password stays out even if an agent typed it through the generic `type` action by mistake. |
+| **Shell metacharacters** | Values are passed as separate process arguments, never interpolated into a shell string — `$`, quotes and backticks in a password are inert. |
+| **File permissions** | `secrets.json` and `audit.log` are `0600`, inside a `0700` directory. Verified, not assumed. |
+| **Network** | There is none. No server, no account, no telemetry, no remote component. |
+| **Code integrity** | Signed with a Developer ID and notarized, hardened runtime enabled. |
+
+### What is *not* protected — read this part
+
+**The store is plaintext JSON, not encrypted.** `0600` stops other user accounts; it does nothing against anything running as you. Another tool, an `npm install` postinstall script, or a second agent can read the file. It is not the macOS Keychain and does not pretend to be.
+
+**Turn on FileVault.** Without it, the file is readable by anyone who takes the disk out of the machine. This is the single highest-value thing you can do, and it takes one setting.
+
+**An agent can't read your password, but it does choose where to put it.** `fill_credential` stops the value entering the agent's reasoning — it does not make the agent trustworthy about *which field* to fill. A prompt-injected agent, or one that has wandered onto an attacker-controlled page, can be persuaded to type your admin password into a form that isn't yours. Nothing in this design prevents that.
+
+That is the real threat model, and the mitigations are operational rather than technical:
+
+- **Scope credentials to the task.** A read-only reporting account, not your admin login. This limits the damage of both a confused agent and a compromised one.
+- **Read the audit log after anything sensitive.** It records which secret was used, on which URL. `agentbrowser audit 50`.
+- **Treat page content as untrusted.** Text on a page an agent visits is data, not instructions — that holds for the agent driving this browser exactly as it holds anywhere else.
+
+**Writing a secret exposes it briefly to `ps`.** `agentbrowser secrets set NAME VALUE` passes the value as a process argument, so it is visible to other processes owned by you for the duration of that one call. Reading is unaffected — `fill_credential` never passes the value on a command line.
+
+### If you want encryption at rest
+
+The store is deliberately a plain file so the app and CLI share one implementation and cannot disagree about what is stored. Moving to the macOS Keychain would add encryption at rest and per-application access control, at the cost of a migration path and a second code path. It is a reasonable thing to want; it is not what this does today.
 
 ---
 
