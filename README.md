@@ -401,29 +401,13 @@ agentbrowser reset_session  # or just drop all cookies and logins
 
 Idle, agentBrowser uses **zero** memory — no process, no browser. Chromium only launches on the first page action (about 270MB, plus 126MB for the session) and is freed on `close`.
 
-### Starting it at login anyway
+### Starting something at login
 
-If you would rather the terminal session daemon be resident:
+**"Start at login" lives in the [menu bar app](app/), not here.** Tick it there and the app starts with your Mac, putting its icon in the menu bar.
 
-```bash
-agentbrowser autostart on      # start at login
-agentbrowser autostart status  # check
-agentbrowser autostart off     # stop and remove
-```
+Earlier versions had an `agentbrowser autostart` command that kept the *CLI session daemon* resident instead. It was removed: it cost around 120 MB of memory, permanently, to save a second on the first terminal command — and did nothing whatsoever for Claude Code or Codex, which start their own process either way. Two similarly-named features starting different processes was worse than useless.
 
-This installs a macOS LaunchAgent at `~/Library/LaunchAgents/com.agentbrowser.daemon.plist`, with `KeepAlive` so it comes back if it ever dies. The resident daemon never times out.
-
-**Most people should leave this off.** What it costs versus what it buys:
-
-| | Autostart off (default) | Autostart on |
-| --- | --- | --- |
-| Memory when unused | 0 MB | ~120 MB, always |
-| First terminal command | ~1–2s slower | instant |
-| Claude Code / Codex | no difference | no difference |
-
-The daemon holds no browser either way — that ~120 MB is the runtime itself, resident whether you use it that day or not. It buys a second or two on the first CLI command and nothing for your agent, which starts its own process regardless.
-
-`agentbrowser uninstall` removes the login agent automatically.
+If you enabled it on an older version, running `agentbrowser install` or `agentbrowser autostart` removes the leftover login item.
 
 ## Updating
 

@@ -64,6 +64,48 @@ export function shouldSelfInstall(): boolean {
   return !isInstalled();
 }
 
+/**
+ * Removes the login agent that older versions installed via
+ * `agentbrowser autostart on`.
+ *
+ * That command kept the CLI session daemon resident — ~120MB, to save a second
+ * on the first terminal command, and no benefit at all to an agent. The menu bar
+ * app now owns "start at login" for the thing people actually mean, so keeping
+ * two similarly-named features that start different processes would only cause
+ * confusion.
+ *
+ * The cleanup has to outlive the feature: anyone who enabled it would otherwise
+ * be left with an orphaned login item pointing at a binary that may have moved.
+ *
+ * Returns true if something was actually removed.
+ */
+export function removeLegacyDaemonAgent(): boolean {
+  const label = "com.agentbrowser.daemon";
+  const plist = path.join(os.homedir(), "Library", "LaunchAgents", `${label}.plist`);
+
+  // The plist's existence is the only trustworthy signal. `launchctl unload` of
+  // a path that isn't there exits 0, so treating launchctl's status as proof
+  // would report a removal that never happened.
+  if (!fs.existsSync(plist)) return false;
+
+  try {
+    execFileSync("launchctl", ["bootout", `gui/${process.getuid?.() ?? ""}/${label}`], { stdio: "pipe" });
+  } catch {
+    try {
+      execFileSync("launchctl", ["unload", "-w", plist], { stdio: "pipe" });
+    } catch {
+      /* not loaded; removing the file is still the right thing */
+    }
+  }
+
+  try {
+    fs.unlinkSync(plist);
+  } catch {
+    return false;
+  }
+  return true;
+}
+
 function stripQuarantine(target: string): void {
   try {
     execFileSync("xattr", ["-d", "com.apple.quarantine", target], { stdio: "pipe" });
@@ -162,6 +204,10 @@ export async function runSelfInstall(): Promise<void> {
 
   ensureConfigDir();
 
+  // Migrate anyone off the removed `autostart` feature. The app's own
+  // start-at-login replaces it.
+  if (removeLegacyDaemonAgent()) ok("Removed the old login agent (superseded by the app)");
+
   // ---------------------------------------------------------------- browser
   say();
   await ensureBrowser();
@@ -225,17 +271,9 @@ export async function runUninstall(): Promise<void> {
   say(bold("  Uninstalling agentBrowser"));
   say();
 
-  // Remove the login agent first — leaving it behind would have launchd
+  // Clear the legacy login agent first — leaving it behind would have launchd
   // repeatedly try to respawn a binary that no longer exists.
-  try {
-    const { disableAutostart, autostartStatus } = await import("./autostart.js");
-    if (!autostartStatus()[0]?.includes("off")) {
-      disableAutostart();
-      ok("Removed the login agent");
-    }
-  } catch {
-    /* nothing installed */
-  }
+  if (removeLegacyDaemonAgent()) ok("Removed the old login agent");
 
   for (const dir of INSTALL_DIRS) {
     const target = path.join(dir, BIN_NAME);

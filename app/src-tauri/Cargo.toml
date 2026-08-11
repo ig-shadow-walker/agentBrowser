@@ -20,6 +20,7 @@ tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri-plugin-autostart = "2"
+sha2 = "0.11.0"
 
 [profile.release]
 # A menu bar utility should be small; these cost build time, not runtime.

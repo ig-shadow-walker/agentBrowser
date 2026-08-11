@@ -28,8 +28,8 @@ fn setup_status() -> engine::SetupStatus {
     let status = engine::setup_status();
     #[cfg(debug_assertions)]
     eprintln!(
-        "[agentbrowser] setup_status: bundled={:?} installed={:?} needs_setup={}",
-        status.bundled_version, status.installed_version, status.needs_setup
+        "[agentbrowser] setup_status: bundled={:?} installed={:?} needs_setup={} reason={:?}",
+        status.bundled_version, status.installed_version, status.needs_setup, status.reason
     );
     status
 }

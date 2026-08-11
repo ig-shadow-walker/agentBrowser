@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Entitlements for the signed, notarized build.
+
+  Notarization requires the hardened runtime, which blocks JIT compilation by
+  default. The bundled engine is a Bun binary, and Bun runs JavaScript through
+  JavaScriptCore's JIT — without these it would launch fine unsigned and then
+  crash only in the signed build, which is a miserable thing to debug.
+
+  Deliberately NOT included:
+    * app-sandbox — the engine must reach ~/Library/Application Support for
+      credentials, spawn Chromium, and read files the user asks it to upload.
+      Sandboxing would need entitlements for each and buy nothing here, since
+      this is a developer tool distributed outside the App Store.
+    * disable-library-validation — we do not load third-party libraries into
+      our process. Chromium runs as a separate process with its own signature,
+      which does not require it.
+-->
+<plist version="1.0">
+<dict>
+  <!-- Bun's JavaScriptCore JIT. -->
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+
+  <!-- JavaScriptCore also maps writable-executable pages for its lower tiers. -->
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+
+  <!-- The engine launches Chromium, which it downloaded itself, so that child
+       is not signed by us. -->
+  <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+  <true/>
+
+  <!-- Reaching arbitrary paths is the whole point: the agent uploads files the
+       user names, from wherever they live. -->
+  <key>com.apple.security.files.user-selected.read-write</key>
+  <true/>
+</dict>
+</plist>

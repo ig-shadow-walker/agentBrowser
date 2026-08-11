@@ -157,6 +157,8 @@ interface SetupStatus {
   bundled_version: string | null;
   installed_version: string | null;
   needs_setup: boolean;
+  /** "missing" | "different" */
+  reason: string | null;
 }
 
 async function refreshSetup(): Promise<void> {
@@ -169,12 +171,25 @@ async function refreshSetup(): Promise<void> {
     }
     // Distinguish "never set up" from "set up, but stale" — the second is the
     // dangerous one, because an agent would silently run the older engine.
-    el("setup-text").textContent = status.installed_version
-      ? `Your agents are using engine v${status.installed_version}, but this app ships v${status.bundled_version}. Update to keep them in step.`
-      : "Connect agentBrowser to Claude Code and Codex. This also downloads a browser if you need one.";
-    el<HTMLButtonElement>("setup-button").textContent = status.installed_version
-      ? "Update"
-      : "Set up";
+    // Note the version numbers can match while the binaries differ, so the
+    // wording avoids claiming the versions are different.
+    if (status.reason === "different") {
+      const { installed_version: installed, bundled_version: bundled } = status;
+      const versions =
+        !installed || !bundled
+          ? null
+          : installed === bundled
+            ? `both report v${bundled}`
+            : `v${installed} vs v${bundled}`;
+      el("setup-text").textContent =
+        `Your agents are running a different build of the engine than this app ships` +
+        `${versions ? ` (${versions})` : ""}. Update to keep them in step.`;
+      el<HTMLButtonElement>("setup-button").textContent = "Update";
+    } else {
+      el("setup-text").textContent =
+        "Connect agentBrowser to Claude Code and Codex. This also downloads a browser if you need one.";
+      el<HTMLButtonElement>("setup-button").textContent = "Set up";
+    }
     box.hidden = false;
   } catch {
     box.hidden = true;

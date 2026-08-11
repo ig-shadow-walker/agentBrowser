@@ -15,11 +15,8 @@ import { parseArgs, usageFor } from "./cli/args.js";
 import { send, isDaemonRunning } from "./cli/client.js";
 import { startDaemon } from "./cli/daemon.js";
 import { startMcpServer } from "./mcp/server.js";
-import os from "node:os";
-import path from "node:path";
 import { registerAll, selfInvocation } from "./install/register.js";
-import { enableAutostart, disableAutostart, autostartStatus } from "./install/autostart.js";
-import { runSelfInstall, runUninstall, shouldSelfInstall } from "./install/selfInstall.js";
+import { runSelfInstall, runUninstall, shouldSelfInstall, removeLegacyDaemonAgent } from "./install/selfInstall.js";
 import { VERSION, PLAYWRIGHT_VERSION } from "./version.js";
 
 function out(text: string): void {
@@ -46,7 +43,6 @@ MANAGING THE SESSION
   status                    Show whether a browser session is running
   close                     Close the browser and end the session
   audit [n]                 Show the last n audited actions (default 20)
-  autostart on|off|status   Keep the CLI daemon running from login (optional)
 
 CREDENTIALS
   secrets list              List stored credential names
@@ -282,25 +278,25 @@ async function main(): Promise<void> {
       return;
     }
 
-    case "autostart": {
-      const sub = rest[0] ?? "status";
-      // Prefer the installed copy: registering a path under build/ or a
-      // Downloads folder would break the moment that file moves.
-      const binary = process.argv[1]?.endsWith(".js")
-        ? path.join(os.homedir(), ".local", "bin", "agentbrowser")
-        : process.execPath;
-
-      if (sub === "on" || sub === "enable") {
-        out(enableAutostart(binary).join("\n"));
-      } else if (sub === "off" || sub === "disable") {
-        out(disableAutostart().join("\n"));
-      } else if (sub === "status") {
-        out(autostartStatus().join("\n"));
-      } else {
-        fail(`Unknown autostart option "${sub}". Use: on, off, status`);
-      }
+    // Kept as a hidden alias so anyone with the old habit gets told where the
+    // setting went, rather than an unhelpful "unknown command".
+    case "autostart":
+      out(
+        [
+          "`autostart` has been removed.",
+          "",
+          "It kept the CLI session daemon resident, which cost ~120MB to save a",
+          "second on the first terminal command, and did nothing for your agents.",
+          "",
+          '"Start at login" now lives in the agentBrowser menu bar app, where it',
+          "starts the app itself.",
+          "",
+          removeLegacyDaemonAgent()
+            ? "The old login agent has been removed from this Mac."
+            : "No old login agent was installed on this Mac.",
+        ].join("\n"),
+      );
       return;
-    }
 
     case "doctor":
       await doctor();

@@ -128,6 +128,57 @@ pub struct SetupStatus {
     /// Version of the copy on PATH, if any — what Claude Code and Codex run.
     pub installed_version: Option<String>,
     pub needs_setup: bool,
+    /// "missing" when nothing is on PATH, "different" when the bytes differ.
+    /// Lets the UI say which problem it is instead of guessing.
+    pub reason: Option<&'static str>,
+}
+
+/// The copy inside this app bundle, ignoring anything on PATH.
+fn bundled_engine() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let dir = exe.parent()?;
+    for name in [String::from("agentbrowser"), format!("agentbrowser-{}", target_triple())] {
+        let candidate = dir.join(name);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
+fn hash_file(path: &PathBuf) -> Option<String> {
+    use sha2::{Digest, Sha256};
+    use std::io::Read;
+
+    let mut file = std::fs::File::open(path).ok()?;
+    let mut hasher = Sha256::new();
+    let mut buffer = vec![0u8; 64 * 1024];
+    loop {
+        let read = file.read(&mut buffer).ok()?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+    Some(hasher.finalize().iter().map(|b| format!("{b:02x}")).collect())
+}
+
+/// Whether two files hold the same bytes.
+///
+/// Compares length first, which settles most cases for free; only identical
+/// lengths are worth hashing. Hashing 72MB costs about 200ms, so this keeps the
+/// common answer instant.
+fn same_contents(a: &PathBuf, b: &PathBuf) -> bool {
+    let (Ok(meta_a), Ok(meta_b)) = (std::fs::metadata(a), std::fs::metadata(b)) else {
+        return false;
+    };
+    if meta_a.len() != meta_b.len() {
+        return false;
+    }
+    match (hash_file(a), hash_file(b)) {
+        (Some(ha), Some(hb)) => ha == hb,
+        _ => false,
+    }
 }
 
 /// The copy on PATH specifically, ignoring the bundled one.
@@ -154,21 +205,35 @@ fn version_of(binary: &PathBuf) -> Option<String> {
     if v.is_empty() { None } else { Some(v) }
 }
 
-/// Setup is needed when nothing is on PATH, or what is there is a different
-/// version from the copy this app ships — an agent launching a stale engine is
-/// the failure this catches.
+/// Setup is needed when nothing is on PATH, or when what is there is not the
+/// same binary this app ships. An agent silently launching a stale engine is the
+/// failure this exists to catch.
+///
+/// This compares *contents*, not version strings, on purpose. A version-based
+/// check only works if every change remembers to bump the version, and the one
+/// time it is forgotten the app confidently reports "up to date" while agents run
+/// something else. Comparing bytes needs no discipline to stay correct.
 pub fn setup_status() -> SetupStatus {
-    let bundled_version = engine_path().as_ref().and_then(version_of);
-    let installed_version = installed_cli().as_ref().and_then(version_of);
+    let bundled = bundled_engine();
+    let installed = installed_cli();
 
-    let needs_setup = match (&bundled_version, &installed_version) {
-        (Some(bundled), Some(installed)) => bundled != installed,
-        (Some(_), None) => true,
+    let bundled_version = bundled.as_ref().and_then(version_of);
+    let installed_version = installed.as_ref().and_then(version_of);
+
+    let (needs_setup, reason) = match (&bundled, &installed) {
         // No bundled engine means this is a dev run; nothing to offer.
-        (None, _) => false,
+        (None, _) => (false, None),
+        (Some(_), None) => (true, Some("missing")),
+        (Some(b), Some(i)) => {
+            if same_contents(b, i) {
+                (false, None)
+            } else {
+                (true, Some("different"))
+            }
+        }
     };
 
-    SetupStatus { bundled_version, installed_version, needs_setup }
+    SetupStatus { bundled_version, installed_version, needs_setup, reason }
 }
 
 /// Runs the engine's own installer: copies itself onto PATH, makes sure a

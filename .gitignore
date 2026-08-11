@@ -21,3 +21,6 @@ src/generated/
 
 # Engine binaries copied in as Tauri sidecars (72MB each).
 app/src-tauri/binaries/
+
+# Apple signing credentials — never commit.
+app/.signing.env
