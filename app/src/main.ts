@@ -153,6 +153,85 @@ async function addSecret(event: Event): Promise<void> {
   }
 }
 
+interface SetupStatus {
+  bundled_version: string | null;
+  installed_version: string | null;
+  needs_setup: boolean;
+}
+
+async function refreshSetup(): Promise<void> {
+  const box = el("setup");
+  try {
+    const status = await invoke<SetupStatus>("setup_status");
+    if (!status.needs_setup) {
+      box.hidden = true;
+      return;
+    }
+    // Distinguish "never set up" from "set up, but stale" — the second is the
+    // dangerous one, because an agent would silently run the older engine.
+    el("setup-text").textContent = status.installed_version
+      ? `Your agents are using engine v${status.installed_version}, but this app ships v${status.bundled_version}. Update to keep them in step.`
+      : "Connect agentBrowser to Claude Code and Codex. This also downloads a browser if you need one.";
+    el<HTMLButtonElement>("setup-button").textContent = status.installed_version
+      ? "Update"
+      : "Set up";
+    box.hidden = false;
+  } catch {
+    box.hidden = true;
+  }
+}
+
+async function doSetup(): Promise<void> {
+  if (busy) return;
+  const button = el<HTMLButtonElement>("setup-button");
+  const log = el<HTMLPreElement>("setup-log");
+
+  busy = true;
+  button.disabled = true;
+  button.textContent = "Working…";
+  log.hidden = true;
+  clearError();
+
+  try {
+    const output = await invoke<string>("run_setup");
+    // Strip ANSI colour: the CLI writes for a terminal, not a webview.
+    log.textContent = output.replace(/\x1b\[[0-9;]*m/g, "").trim();
+    log.hidden = false;
+    await refreshStatus();
+    await refreshSetup();
+    await refreshSecrets();
+  } catch (error) {
+    showError(describe(error));
+    button.disabled = false;
+    button.textContent = "Try again";
+  } finally {
+    busy = false;
+  }
+}
+
+async function initAutostart(): Promise<void> {
+  const box = el<HTMLInputElement>("autostart");
+  try {
+    box.checked = await invoke<boolean>("autostart_enabled");
+  } catch {
+    box.disabled = true;
+    return;
+  }
+  box.addEventListener("change", async () => {
+    const wanted = box.checked;
+    box.disabled = true;
+    try {
+      await invoke("autostart_set", { enabled: wanted });
+    } catch (error) {
+      // Put the checkbox back rather than showing a state that is not real.
+      box.checked = !wanted;
+      showError(describe(error));
+    } finally {
+      box.disabled = false;
+    }
+  });
+}
+
 async function init(): Promise<void> {
   try {
     el("version").textContent = `v${await invoke<string>("app_version")}`;
@@ -161,7 +240,11 @@ async function init(): Promise<void> {
   }
 
   el<HTMLFormElement>("add-form").addEventListener("submit", (e) => void addSecret(e));
+  el("setup-button").addEventListener("click", () => void doSetup());
+
   await refreshStatus();
+  await refreshSetup();
+  await initAutostart();
   await refreshSecrets();
 }
 

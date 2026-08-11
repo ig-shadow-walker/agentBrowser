@@ -112,6 +112,58 @@ h2 {
   background: var(--danger);
 }
 
+/* ----------------------------------------------------------------- setup */
+
+.setup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: var(--card);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+}
+
+.setup-text {
+  margin: 0;
+  font-size: 12px;
+  text-wrap: pretty;
+}
+
+.setup-log {
+  margin: 0;
+  max-height: 130px;
+  overflow: auto;
+  padding: 8px;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 10.5px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  color: var(--muted);
+  background: var(--bg);
+  border-radius: 6px;
+  user-select: text;
+}
+
+/* --------------------------------------------------------------- toggle */
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.toggle input {
+  width: auto;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
 /* -------------------------------------------------------------- secrets */
 
 .section {

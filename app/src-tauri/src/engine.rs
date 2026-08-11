@@ -121,6 +121,64 @@ pub fn status() -> EngineStatus {
     }
 }
 
+#[derive(serde::Serialize)]
+pub struct SetupStatus {
+    /// Version of the copy shipped inside this app.
+    pub bundled_version: Option<String>,
+    /// Version of the copy on PATH, if any — what Claude Code and Codex run.
+    pub installed_version: Option<String>,
+    pub needs_setup: bool,
+}
+
+/// The copy on PATH specifically, ignoring the bundled one.
+fn installed_cli() -> Option<PathBuf> {
+    let home = std::env::var("HOME").ok()?;
+    INSTALL_DIRS
+        .iter()
+        .map(|dir| {
+            if dir.starts_with('/') {
+                PathBuf::from(dir).join("agentbrowser")
+            } else {
+                PathBuf::from(&home).join(dir).join("agentbrowser")
+            }
+        })
+        .find(|p| p.is_file())
+}
+
+fn version_of(binary: &PathBuf) -> Option<String> {
+    let output = Command::new(binary).arg("version").output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let v = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if v.is_empty() { None } else { Some(v) }
+}
+
+/// Setup is needed when nothing is on PATH, or what is there is a different
+/// version from the copy this app ships — an agent launching a stale engine is
+/// the failure this catches.
+pub fn setup_status() -> SetupStatus {
+    let bundled_version = engine_path().as_ref().and_then(version_of);
+    let installed_version = installed_cli().as_ref().and_then(version_of);
+
+    let needs_setup = match (&bundled_version, &installed_version) {
+        (Some(bundled), Some(installed)) => bundled != installed,
+        (Some(_), None) => true,
+        // No bundled engine means this is a dev run; nothing to offer.
+        (None, _) => false,
+    };
+
+    SetupStatus { bundled_version, installed_version, needs_setup }
+}
+
+/// Runs the engine's own installer: copies itself onto PATH, makes sure a
+/// browser is available, and registers with Claude Code and Codex. Reusing the
+/// CLI's flow means there is exactly one implementation of "install", already
+/// covered by the engine's test suite.
+pub fn run_setup() -> Result<String, String> {
+    run(&["install"])
+}
+
 pub fn list_secrets() -> Result<Vec<String>, String> {
     let raw = run(&["secrets", "list", "--json"])?;
     serde_json::from_str::<Vec<String>>(&raw)

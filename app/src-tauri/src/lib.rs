@@ -24,6 +24,43 @@ fn engine_status() -> engine::EngineStatus {
 }
 
 #[tauri::command]
+fn setup_status() -> engine::SetupStatus {
+    let status = engine::setup_status();
+    #[cfg(debug_assertions)]
+    eprintln!(
+        "[agentbrowser] setup_status: bundled={:?} installed={:?} needs_setup={}",
+        status.bundled_version, status.installed_version, status.needs_setup
+    );
+    status
+}
+
+/// Setup downloads a browser on a fresh machine, so it can take a while.
+/// Run it off the UI thread so the panel stays responsive.
+#[tauri::command]
+async fn run_setup() -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(engine::run_setup)
+        .await
+        .map_err(|e| format!("Setup task failed: {e}"))?
+}
+
+#[tauri::command]
+fn autostart_enabled(app: tauri::AppHandle) -> bool {
+    use tauri_plugin_autostart::ManagerExt;
+    let enabled = app.autolaunch().is_enabled().unwrap_or(false);
+    #[cfg(debug_assertions)]
+    eprintln!("[agentbrowser] autostart_enabled -> {enabled}");
+    enabled
+}
+
+#[tauri::command]
+fn autostart_set(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    use tauri_plugin_autostart::ManagerExt;
+    let manager = app.autolaunch();
+    let result = if enabled { manager.enable() } else { manager.disable() };
+    result.map_err(|e| format!("Could not change the login setting: {e}"))
+}
+
+#[tauri::command]
 fn secrets_list() -> Result<Vec<String>, String> {
     let result = engine::list_secrets();
     #[cfg(debug_assertions)]
@@ -53,9 +90,19 @@ fn show_panel(app: &tauri::AppHandle) {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_autostart::init(
+            // LaunchAgent is the right mechanism for a menu bar utility: it
+            // starts at login without needing an installer or admin rights.
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .invoke_handler(tauri::generate_handler![
             app_version,
             engine_status,
+            setup_status,
+            run_setup,
+            autostart_enabled,
+            autostart_set,
             secrets_list,
             secrets_set,
             secrets_remove

@@ -44,8 +44,8 @@ src-tauri/
 | 2. Menu bar icon, no Dock icon | done |
 | 3. Secrets UI | done |
 | 4. Engine bundled as sidecar | done |
-| 5. First-launch setup | not started |
-| 6. Launch at login | not started |
+| 5. First-launch setup | done |
+| 6. Launch at login | done |
 | 7. Signed and notarized DMG | blocked on an Apple Developer certificate |
 
 ## Notes
