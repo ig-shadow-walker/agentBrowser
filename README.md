@@ -27,6 +27,8 @@ Which meant our agent could do the interesting 80% and then hand the task back t
 
 The fix turned out to be a change of vantage point. The restriction applies to code running *inside* the page. Drive Chromium from *outside*, over the DevTools Protocol, and setting a file on an input is an ordinary operation — no gesture required, because there's no page-level JavaScript asking for one.
 
+That outside-the-page control comes from **[Playwright](https://playwright.dev)**, which is what makes the whole thing possible. agentBrowser is the layer on top: an interface an agent can reason about, credentials it never gets to see, and a single binary you can hand to someone.
+
 That one shift unlocks the rest of the list that in-page automation can't reach:
 
 | | In-page automation | agentBrowser |
@@ -378,6 +380,17 @@ See [`app/README.md`](app/README.md) for the app's internals.
 | "Refs are stale" | Working as intended. Take a fresh snapshot. |
 | Something went wrong | `agentbrowser audit 50` — every action, in order |
 | Full diagnostic | `agentbrowser doctor` |
+
+---
+
+## Built with
+
+| | |
+| --- | --- |
+| **[Playwright](https://playwright.dev)** | Drives Chromium over the DevTools Protocol. The capability this whole project rests on — everything else here is the layer that makes it usable by an agent. |
+| **[Tauri](https://tauri.app)** | The menu bar app. ~4MB of Rust rather than a bundled second browser. |
+| **[Bun](https://bun.sh)** | Compiles the engine into one self-contained binary, so users need no Node.js. |
+| **[Model Context Protocol](https://modelcontextprotocol.io)** | How Claude Code and Codex discover and call the tools. |
 
 ---
 
