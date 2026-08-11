@@ -10,8 +10,6 @@ Claude Code and Codex get a real Chromium they drive from the outside — with n
 
 ![macOS](https://img.shields.io/badge/macOS-13%2B-000?logo=apple&logoColor=white)
 ![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-supported-000?logo=apple&logoColor=white)
-![Signed](https://img.shields.io/badge/signed%20%26%20notarized-Developer%20ID-2aa146)
-![No telemetry](https://img.shields.io/badge/telemetry-none-2aa146)
 
 </div>
 
