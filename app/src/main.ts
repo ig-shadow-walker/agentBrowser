@@ -10,6 +10,8 @@ interface EngineStatus {
   installed: boolean;
   version: string | null;
   path: string | null;
+  /** "bundled" | "installed" | "dev" */
+  source: string | null;
 }
 
 const el = <T extends HTMLElement>(id: string): T =>
@@ -34,12 +36,18 @@ async function refreshStatus(): Promise<void> {
     const status = await invoke<EngineStatus>("engine_status");
     if (status.installed) {
       dot.className = "dot ok";
-      text.textContent = status.version
-        ? `Engine v${status.version} ready`
-        : "Engine ready";
+      const version = status.version ? `v${status.version}` : "";
+      // Only worth naming the source when it is *not* the copy inside this app,
+      // since anything else means behaviour could differ from a clean install.
+      const suffix =
+        status.source === "installed" ? " — using your installed copy"
+        : status.source === "dev" ? " — dev build"
+        : "";
+      text.textContent = `Engine ${version} ready${suffix}`.replace(/\s+/g, " ").trim();
+      if (status.path) text.title = status.path;
     } else {
       dot.className = "dot bad";
-      text.textContent = "Engine not installed";
+      text.textContent = "Engine not found";
     }
   } catch (error) {
     dot.className = "dot bad";

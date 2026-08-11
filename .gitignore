@@ -18,3 +18,6 @@ secrets.json
 !.env.example
 *.log
 src/generated/
+
+# Engine binaries copied in as Tauri sidecars (72MB each).
+app/src-tauri/binaries/

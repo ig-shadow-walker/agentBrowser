@@ -43,7 +43,7 @@ src-tauri/
 | 1. Scaffold that builds and runs | done |
 | 2. Menu bar icon, no Dock icon | done |
 | 3. Secrets UI | done |
-| 4. Engine bundled as sidecar | not started |
+| 4. Engine bundled as sidecar | done |
 | 5. First-launch setup | not started |
 | 6. Launch at login | not started |
 | 7. Signed and notarized DMG | blocked on an Apple Developer certificate |

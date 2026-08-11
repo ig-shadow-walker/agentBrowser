@@ -36,6 +36,9 @@
       "app",
       "dmg"
     ],
+    "externalBin": [
+      "binaries/agentbrowser"
+    ],
     "category": "DeveloperTool",
     "shortDescription": "An unrestricted headless browser for coding agents",
     "longDescription": "Gives Claude Code and Codex a real Chromium they can drive, without the restrictions browsers place on in-page automation.",

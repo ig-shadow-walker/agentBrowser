@@ -65,6 +65,15 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
+            // Logged in release too: when someone reports odd behaviour, the
+            // first question is always which engine copy is actually in use.
+            match engine::resolve() {
+                Some((path, source)) => {
+                    eprintln!("[agentbrowser] engine ({source}): {}", path.display())
+                }
+                None => eprintln!("[agentbrowser] engine not found"),
+            }
+
             let open_item = MenuItem::with_id(app, "open", "Open agentBrowser", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit agentBrowser", true, None::<&str>)?;
 

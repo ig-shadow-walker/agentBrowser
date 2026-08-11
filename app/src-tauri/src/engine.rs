@@ -8,30 +8,78 @@ use std::process::Command;
 /// and the terminal can never disagree about what is stored, and there is no
 /// second copy of the storage format to keep in step.
 ///
-/// Step 4 replaces this lookup with a bundled Tauri sidecar. Until then we use
-/// whatever `agentbrowser install` put on disk.
-const CANDIDATE_DIRS: [&str; 3] = [".local/bin", "/usr/local/bin", "/opt/homebrew/bin"];
+/// The frontend never runs anything itself — it calls the typed commands in
+/// lib.rs. That is why this uses `std::process::Command` rather than Tauri's
+/// shell plugin: granting the webview a general shell-execute permission would
+/// be a much wider surface than this needs.
+const INSTALL_DIRS: [&str; 3] = [".local/bin", "/usr/local/bin", "/opt/homebrew/bin"];
 
 #[derive(serde::Serialize)]
 pub struct EngineStatus {
     pub installed: bool,
     pub version: Option<String>,
     pub path: Option<String>,
+    /// "bundled" | "installed" | "dev" — surfaced so it is obvious which copy
+    /// is in use when something behaves unexpectedly.
+    pub source: Option<String>,
+}
+
+/// The Rust target triple, used to find an unbundled sidecar during development.
+fn target_triple() -> String {
+    format!("{}-apple-darwin", std::env::consts::ARCH)
+}
+
+/// Where the engine is, and which copy it is.
+///
+/// Ordered deliberately: the copy shipped inside this app wins, so the app is
+/// self-contained and its behaviour cannot drift with whatever happens to be on
+/// PATH. Only if there is no bundled copy do we fall back.
+pub fn resolve() -> Option<(PathBuf, &'static str)> {
+    // 1. Bundled sidecar. Tauri strips the triple when bundling, so the file
+    //    sits next to the app binary as plain `agentbrowser`; check the
+    //    suffixed name too, for a sidecar that has not been through bundling.
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            for name in [String::from("agentbrowser"), format!("agentbrowser-{}", target_triple())] {
+                let candidate = dir.join(name);
+                if candidate.is_file() {
+                    return Some((candidate, "bundled"));
+                }
+            }
+        }
+    }
+
+    // 2. Whatever `agentbrowser install` put on PATH.
+    if let Ok(home) = std::env::var("HOME") {
+        for dir in INSTALL_DIRS {
+            let candidate = if dir.starts_with('/') {
+                PathBuf::from(dir).join("agentbrowser")
+            } else {
+                PathBuf::from(&home).join(dir).join("agentbrowser")
+            };
+            if candidate.is_file() {
+                return Some((candidate, "installed"));
+            }
+        }
+    }
+
+    // 3. Repo build output, so `npm run tauri dev` works without installing.
+    let arch = if std::env::consts::ARCH == "aarch64" { "arm64" } else { "x64" };
+    if let Ok(exe) = std::env::current_exe() {
+        // target/debug/agentbrowser-app -> repo root is four levels up.
+        if let Some(repo) = exe.ancestors().nth(4) {
+            let candidate = repo.join("build").join(format!("agentbrowser-darwin-{arch}"));
+            if candidate.is_file() {
+                return Some((candidate, "dev"));
+            }
+        }
+    }
+
+    None
 }
 
 pub fn engine_path() -> Option<PathBuf> {
-    let home = std::env::var("HOME").ok()?;
-    for dir in CANDIDATE_DIRS {
-        let candidate = if dir.starts_with('/') {
-            PathBuf::from(dir).join("agentbrowser")
-        } else {
-            PathBuf::from(&home).join(dir).join("agentbrowser")
-        };
-        if candidate.is_file() {
-            return Some(candidate);
-        }
-    }
-    None
+    resolve().map(|(path, _)| path)
 }
 
 /// Runs the engine and returns stdout, or a message suitable for showing a user.
@@ -62,16 +110,14 @@ pub fn run(args: &[&str]) -> Result<String, String> {
 }
 
 pub fn status() -> EngineStatus {
-    match engine_path() {
-        None => EngineStatus { installed: false, version: None, path: None },
-        Some(path) => {
-            let version = run(&["version"]).ok();
-            EngineStatus {
-                installed: true,
-                version,
-                path: Some(path.to_string_lossy().to_string()),
-            }
-        }
+    match resolve() {
+        None => EngineStatus { installed: false, version: None, path: None, source: None },
+        Some((path, source)) => EngineStatus {
+            installed: true,
+            version: run(&["version"]).ok(),
+            path: Some(path.to_string_lossy().to_string()),
+            source: Some(source.to_string()),
+        },
     }
 }
 
