@@ -1,29 +1,33 @@
-/* A menu bar panel should feel native: system font, system colours, and it
-   must follow the user's appearance without a theme toggle of its own. */
+/* A menu bar panel should feel native: system font, system colours, and it must
+   follow the user's appearance without a theme control of its own. */
 
 :root {
-  --bg: #f5f5f7;
+  --bg: #f2f2f4;
   --card: #ffffff;
   --text: #1d1d1f;
   --muted: #6e6e73;
-  --border: #d2d2d7;
+  --border: #d8d8dd;
+  --field: #ffffff;
   --accent: #0071e3;
-  --pending: #8a6d00;
-  --pending-bg: #fff8e1;
+  --accent-text: #ffffff;
+  --danger: #c9382c;
+  --ok: #2aa146;
 
   color-scheme: light dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1e1e1e;
+    --bg: #1c1c1e;
     --card: #2a2a2c;
     --text: #f5f5f7;
-    --muted: #98989d;
-    --border: #3a3a3c;
+    --muted: #9a9aa0;
+    --border: #3a3a3d;
+    --field: #333336;
     --accent: #2997ff;
-    --pending: #e0c060;
-    --pending-bg: #33301f;
+    --accent-text: #ffffff;
+    --danger: #ff6961;
+    --ok: #32d158;
   }
 }
 
@@ -35,42 +39,41 @@ body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.45;
   color: var(--text);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
-  /* Nothing here is text the user needs to select. */
   user-select: none;
 }
 
 .panel {
   /* Top padding clears the transparent title bar. */
-  padding: 34px 16px 16px;
+  padding: 32px 14px 12px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   min-height: 100vh;
 }
 
 .header {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 7px;
 }
 
 h1 {
   margin: 0;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
 
 h2 {
-  margin: 0 0 6px;
-  font-size: 12px;
+  margin: 0;
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   color: var(--muted);
 }
 
@@ -80,39 +83,163 @@ h2 {
   font-variant-numeric: tabular-nums;
 }
 
-.card {
+/* ---------------------------------------------------------------- status */
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px;
+  border-radius: 8px;
+  font-size: 12px;
 }
 
-.card p {
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex: none;
+}
+
+.dot.ok {
+  background: var(--ok);
+}
+
+.dot.bad {
+  background: var(--danger);
+}
+
+/* -------------------------------------------------------------- secrets */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.hint {
   margin: 0;
-}
-
-.card p + p {
-  margin-top: 6px;
-}
-
-.muted {
-  color: var(--muted);
-}
-
-.pending {
-  margin-top: 8px !important;
-  display: inline-block;
   font-size: 11px;
-  color: var(--pending);
-  background: var(--pending-bg);
-  border-radius: 5px;
-  padding: 2px 7px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+.add {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 6px;
+}
+
+input {
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 8px;
+  color: var(--text);
+  background: var(--field);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  min-width: 0;
+  user-select: text;
+}
+
+input::placeholder {
+  color: var(--muted);
+  opacity: 0.8;
+}
+
+input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  border-color: transparent;
+}
+
+button {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: var(--accent);
+  color: var(--accent-text);
+  cursor: default;
+  white-space: nowrap;
+}
+
+button:disabled {
+  opacity: 0.55;
+}
+
+.error {
+  margin: 0;
+  font-size: 11px;
+  color: var(--danger);
+  text-wrap: pretty;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px 7px 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: text;
+}
+
+.remove {
+  background: transparent;
+  color: var(--muted);
+  border-color: var(--border);
+  padding: 3px 9px;
+  font-size: 11px;
+}
+
+.remove:hover:not(:disabled) {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.empty {
+  margin: 0;
+  padding: 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+  border-radius: 7px;
 }
 
 .footer {
   margin-top: auto;
-  padding-top: 8px;
-  font-size: 11px;
+  padding-top: 6px;
+  font-size: 10.5px;
+  color: var(--muted);
   text-align: center;
   text-wrap: balance;
 }

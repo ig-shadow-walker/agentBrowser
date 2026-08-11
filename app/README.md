@@ -41,8 +41,8 @@ src-tauri/
 | Step | State |
 | --- | --- |
 | 1. Scaffold that builds and runs | done |
-| 2. Menu bar icon, no Dock icon | not started |
-| 3. Secrets UI | not started |
+| 2. Menu bar icon, no Dock icon | done |
+| 3. Secrets UI | done |
 | 4. Engine bundled as sidecar | not started |
 | 5. First-launch setup | not started |
 | 6. Launch at login | not started |

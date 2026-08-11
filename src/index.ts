@@ -93,6 +93,12 @@ async function handleSecrets(argv: string[]): Promise<void> {
 
   if (!sub || sub === "list") {
     const names = listSecretNames();
+    // --json exists so the menu bar app has a stable contract to read, rather
+    // than screen-scraping prose that changes whenever the wording improves.
+    if (argv.includes("--json")) {
+      out(JSON.stringify(names));
+      return;
+    }
     out(
       names.length
         ? `Stored credentials (values never shown):\n${names.map((n) => `  ${n}`).join("\n")}`

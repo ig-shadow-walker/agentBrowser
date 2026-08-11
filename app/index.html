@@ -10,26 +10,48 @@
     <main class="panel">
       <header class="header">
         <h1>agentBrowser</h1>
-        <span class="version" id="version">—</span>
+        <span class="version" id="version"></span>
       </header>
 
-      <section class="card">
-        <h2>Status</h2>
-        <p class="muted" id="status">Checking…</p>
-      </section>
+      <div class="status" id="status">
+        <span class="dot" id="status-dot"></span>
+        <span id="status-text">Checking…</span>
+      </div>
 
-      <section class="card">
+      <section class="section">
         <h2>Credentials</h2>
-        <p class="muted">
-          Passwords stored here are typed straight into the page and never reach
-          your agent.
+        <p class="hint">
+          Typed straight into the page by the engine. Your agent only ever sees
+          the name.
         </p>
-        <p class="pending">Coming in step 3</p>
+
+        <form class="add" id="add-form" autocomplete="off">
+          <input
+            id="secret-name"
+            type="text"
+            placeholder="MY_APP_PASSWORD"
+            spellcheck="false"
+            autocapitalize="characters"
+            aria-label="Credential name"
+          />
+          <input
+            id="secret-value"
+            type="password"
+            placeholder="value"
+            aria-label="Credential value"
+          />
+          <button type="submit" id="add-button">Save</button>
+        </form>
+
+        <p class="error" id="error" hidden></p>
+
+        <ul class="list" id="list"></ul>
+        <p class="empty" id="empty" hidden>No credentials stored yet.</p>
       </section>
 
       <footer class="footer">
-        <span class="muted">Claude Code and Codex run the browser themselves —
-        this window is just a control panel.</span>
+        Claude Code and Codex run the browser themselves — closing this window
+        changes nothing.
       </footer>
     </main>
     <script type="module" src="/src/main.ts"></script>
