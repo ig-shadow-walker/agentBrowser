@@ -24,3 +24,12 @@ app/src-tauri/binaries/
 
 # Apple signing credentials — never commit.
 app/.signing.env
+
+# Certificate enrolment artifacts. The .cer and .certSigningRequest are public
+# (no private key), but they do not belong in the repo — and keeping them here
+# invites someone to drop the matching .p12 alongside, which WOULD be a leak.
+# The private key belongs in the login keychain and nowhere else.
+*.certSigningRequest
+*.cer
+*.p12
+*.mobileprovision
